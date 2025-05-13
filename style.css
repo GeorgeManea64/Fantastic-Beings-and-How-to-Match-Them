@@ -1,0 +1,55 @@
+body {
+    margin: 0;
+    padding: 0;
+}
+
+#board {
+    height: 100vh;
+    width: 100vw;
+    background-image: url(Images/board-bg.png);
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#status-bar {
+    width: 100%;
+    height: 10vw;
+    background-image: url(Images/state-panel-bg.png);
+    background-size: cover;
+    background-position: center;
+}
+
+#map {
+    margin-top: 3vh;
+    height: 60vh;
+    width: 60vh;
+    border-collapse: collapse;
+}
+
+.cell {
+    border: 1px solid rgb(103, 101, 168);
+    background-color: rgba(103, 101, 168, 0.4);
+    width: calc(60vh / 5);
+    height: calc(60vh / 5);
+    
+}
+
+.cell img {
+    width: 100%;
+    height: 70%;
+    object-fit: contain;
+    display: block;
+}
+
+.cell:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+}
+
+.cell.selected {
+    background-color: rgba(255, 255, 255, 0.4);
+    outline: 2px solid yellow;
+}
