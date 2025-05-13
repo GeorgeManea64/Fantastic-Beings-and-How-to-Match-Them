@@ -45,11 +45,16 @@ body {
 }
 
 .cell:hover {
-    background-color: rgba(255, 255, 255, 0.2);
+    background-image: url(Images/cell-hover-bg.png);
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
     cursor: pointer;
 }
 
 .cell.selected {
-    background-color: rgba(255, 255, 255, 0.4);
-    outline: 2px solid yellow;
+    background-image: url(Images/cell-selected-bg.png);
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
 }

@@ -1,13 +1,12 @@
 let firstSelectedCell = null;
 let isSwapping = false;
 
-const CREATURES = ['zouwu', 'swooping', 'salamander', 'puffskein', 'kelpie'];
+const creatureTypes = ['zouwu', 'swooping', 'salamander', 'puffskein', 'kelpie'];
 
-// Function to get a random creature
-function getRandomCreature() {
-    const index = Math.floor(Math.random() * CREATURES.length);
-    return CREATURES[index];
-}
+window.generateRandomBeingName = function () {
+    const index = Math.floor(Math.random() * creatureTypes.length);
+    return creatureTypes[index];
+};
 
 // Clears the table
 window.clearMap = function() {
@@ -32,7 +31,7 @@ window.renderMap = function(rowsCount, colsCount) {
 
     // Generate random creature grid and populate the map
     const creatureArray = Array.from({ length: rowsCount }, () =>
-        Array.from({ length: colsCount }, () => getRandomCreature())
+        Array.from({ length: colsCount }, () => generateRandomBeingName())
     );
 
     window.redrawMap(creatureArray);
@@ -56,7 +55,7 @@ window.redrawMap = function(creatureArray) {
             const cell = rows[row].cells[col];
             const creature = creatureArray[row][col];
 
-            if (!CREATURES.includes(creature)) {
+            if (!creatureTypes.includes(creature)) {
                 return false;
             }
 
@@ -197,5 +196,38 @@ function clearMatches(matchedCells) {
         cell.removeAttribute('data-being');
     });
 
-    // After clearing, you could call a refill function here
+    setTimeout(() => {
+        refillMap();
+
+        // Check again for new matches (chain reaction)
+        const newMatches = findMatches();
+        if (newMatches.length > 0) {
+            clearMatches(newMatches); // Recurse!
+        }
+    }, 300);
+}
+
+function refillMap() {
+    const map = document.getElementById('map');
+    const rows = map.rows;
+    const rowCount = rows.length;
+    const colCount = rows[0].cells.length;
+
+    for (let row = 0; row < rowCount; row++) {
+        for (let col = 0; col < colCount; col++) {
+            const cell = rows[row].cells[col];
+            if (!cell.hasAttribute('data-being')) {
+                const creature = window.generateRandomBeingName();
+                cell.setAttribute('data-being', creature);
+
+                const img = document.createElement('img');
+                img.src = `Images/${creature}.png`;
+                img.setAttribute('data-coords', `x${col}_y${row}`);
+                cell.appendChild(img);
+
+                // Rebind click handler
+                cell.addEventListener('click', () => onCellClick(cell, row, col));
+            }
+        }
+    }
 }
