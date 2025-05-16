@@ -5,16 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fantastical Creatures</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Marmelad&display=swap" rel="stylesheet">
 </head>
 <body>
     <div id="board">
-        <div id="status-bar">
-            <!-- Game stats go here -->
+      <div id="status-bar">
+        <div id="left-status">
+            <div id="beings-for-win"></div>
         </div>
-        <table id="map">
-            
-        </table>
+        <div id="center-status">
+            <span>Moves: <span id="moves-value">15</span></span>
+            <span>Score: <span id="score-value">0</span></span>
+        </div>
+      </div>
+        <table id="map"></table>
+          <div id="game-footer">
+        Swap animals to form a sequence of three in a row
+      </div>  
     </div>
+    
 
     <script src="script.js"></script>
 </body>

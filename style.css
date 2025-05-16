@@ -1,6 +1,7 @@
 body {
     margin: 0;
     padding: 0;
+    font-family: 'Marmelad', sans-serif;
 }
 
 #board {
@@ -16,10 +17,15 @@ body {
 
 #status-bar {
     width: 100%;
-    height: 10vw;
+    height: 20vw;
     background-image: url(Images/state-panel-bg.png);
     background-size: cover;
-    background-position: center;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2vw;
+    box-sizing: border-box;
+    color: white;
 }
 
 #map {
@@ -57,4 +63,38 @@ body {
     background-size: cover;
     background-repeat: no-repeat;
     background-position: center;
+}
+
+#beings-for-win {
+    display: flex;
+    align-items: center;
+    gap: 1vw;
+}
+
+#beings-for-win img {
+    width: 35px;
+    height: 35px;
+}
+
+.target-count {
+    font-size: 1.5rem;
+    margin-right: 1vw;
+}
+
+#center-status {
+    display: flex;
+    gap: 2vw;
+    font-size: 1.5rem;
+}
+
+#game-footer {
+    width: 100%;
+    height: 10vw;
+    background-image: url('Images/game-footer.png');
+    background-size: cover;
+    padding: 1rem;
+    text-align: center;
+    font-size: 1.5rem;
+    color: white;
+    margin: 0;
 }
