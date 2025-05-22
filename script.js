@@ -1,5 +1,13 @@
+const clickSound = new Audio('SFX/click.wav');
+const matchSound = new Audio('SFX/match.wav');
+
 let firstSelectedCell = null;
 let isSwapping = false;
+
+let isCascading = false;
+let isAnimating = false;
+let hasPlayedMatchSound = false;
+let hasPlayedMatchSoundThisCascade = false;
 
 const creatureTypes = ['zouwu', 'swooping', 'salamander', 'puffskein', 'kelpie'];
 
@@ -69,7 +77,6 @@ window.redrawMap = function(creatureArray) {
             img.setAttribute('data-coords', `x${col}_y${row}`);
 
             cell.appendChild(img);
-            cell.addEventListener('click', () => onCellClick(cell, row, col));
         }
     }
 
@@ -78,28 +85,35 @@ window.redrawMap = function(creatureArray) {
 
 // On DOM load, initialize the map
 window.addEventListener('DOMContentLoaded', () => {
-    window.renderMap(5, 5);
-});
+    document.getElementById('map').addEventListener('click', (e) => {
+    const cell = e.target.closest('td.cell');
+    if (!cell || !cell.parentElement || !cell.parentElement.parentElement) return;
 
+    const row = cell.parentElement.rowIndex;
+    const col = cell.cellIndex;
+
+    onCellClick(cell, row, col);
+});
+});
 function onCellClick(cell, row, col) {
-    if (!gameActive || isSwapping) return;
+    if (!gameActive || isSwapping || isAnimating) return; // <-- updated
 
     if (!firstSelectedCell) {
         firstSelectedCell = { cell, row, col };
         cell.classList.add('selected');
+        clickSound.currentTime = 0;
+        clickSound.play();
         return;
     }
 
     const { cell: firstCell, row: r1, col: c1 } = firstSelectedCell;
 
-    // Same cell clicked again — deselect
     if (r1 === row && c1 === col) {
         firstCell.classList.remove('selected');
         firstSelectedCell = null;
         return;
     }
 
-    // Check if the second cell is a neighbor
     const isNeighbor =
         (Math.abs(r1 - row) === 1 && c1 === col) ||
         (Math.abs(c1 - col) === 1 && r1 === row);
@@ -110,18 +124,12 @@ function onCellClick(cell, row, col) {
         return;
     }
 
-    // Swap logic
     isSwapping = true;
+    isAnimating = true; // <-- prevent clicks
     swapCells(firstCell, cell);
 
-    // Deselect
     firstCell.classList.remove('selected');
     firstSelectedCell = null;
-
-    // Swap is async — allow it to complete
-    setTimeout(() => {
-        isSwapping = false;
-    }, 300);
 }
 
 function swapCells(cellA, cellB) {
@@ -132,32 +140,65 @@ function swapCells(cellA, cellB) {
     const imgA = cellA.querySelector('img');
     const imgB = cellB.querySelector('img');
 
-    // Swap beings and images
-    cellA.setAttribute('data-being', beingB);
-    cellB.setAttribute('data-being', beingA);
-    cellA.innerHTML = '';
-    cellB.innerHTML = '';
-    if (imgB) cellA.appendChild(imgB);
-    if (imgA) cellB.appendChild(imgA);
+    // Determine direction
+    const dx = cellB.cellIndex - cellA.cellIndex;
+    const dy = cellB.parentElement.rowIndex - cellA.parentElement.rowIndex;
 
-    // After swap, check for matches
-    const matched = findMatches();
+    const offsetX = dx * cellA.offsetWidth;
+    const offsetY = dy * cellA.offsetHeight;
 
-    if (matched.length > 0) {
-        movesLeft--;
-        document.getElementById('moves-value').textContent = movesLeft;
-        clearMatches(matched);
-    } else {
-        // No match — revert the swap
+    // Apply transform to animate
+    imgA.style.transition = 'transform 0.3s ease';
+    imgB.style.transition = 'transform 0.3s ease';
+    imgA.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+    imgB.style.transform = `translate(${-offsetX}px, ${-offsetY}px)`;
+
+    setTimeout(() => {
+        // Reset transform styles
+        imgA.style.transition = '';
+        imgB.style.transition = '';
+        imgA.style.transform = '';
+        imgB.style.transform = '';
+
+        // Swap images and data
+        cellA.setAttribute('data-being', beingB);
+        cellB.setAttribute('data-being', beingA);
+        cellA.innerHTML = '';
+        cellB.innerHTML = '';
+        if (imgB) cellA.appendChild(imgB);
+        if (imgA) cellB.appendChild(imgA);
+
+        const matched = findMatches();
+
+        if (matched.length > 0) {
+            matchSound.pause();
+            matchSound.currentTime = 0;
+            matchSound.play().catch(e => console.warn('Match sound failed to play:', e));
+            hasPlayedMatchSoundThisCascade = true;
+
+            isCascading = true;
+            movesLeft--;
+            document.getElementById('moves-value').textContent = movesLeft;
+            clearMatches(matched);
+        } else {
+            setTimeout(() => {
+                // Revert if no match
+                cellA.setAttribute('data-being', beingA);
+                cellB.setAttribute('data-being', beingB);
+                cellA.innerHTML = '';
+                cellB.innerHTML = '';
+                if (imgA) cellA.appendChild(imgA);
+                if (imgB) cellB.appendChild(imgB);
+                isSwapping = false;
+                isAnimating = false;
+            }, 300);
+            return;
+        }
+
         setTimeout(() => {
-            cellA.setAttribute('data-being', beingA);
-            cellB.setAttribute('data-being', beingB);
-            cellA.innerHTML = '';
-            cellB.innerHTML = '';
-            if (imgA) cellA.appendChild(imgA);
-            if (imgB) cellB.appendChild(imgB);
-        }, 300);
-    }
+            isSwapping = false;
+        }, 1000);
+    }, 300);
 }
 
 function findMatches() {
@@ -203,52 +244,114 @@ function findMatches() {
 }
 
 function clearMatches(matchedCells) {
+    if (matchedCells.length === 0) {
+        isCascading = false;
+        hasPlayedMatchSoundThisCascade = false; // Reset for next cascade
+        return;
+    }
+
+    if (!isCascading) {
+        isCascading = true;
+        hasPlayedMatchSoundThisCascade = false; // Start of new cascade
+    }
+
     matchedCells.forEach(cell => {
         const being = cell.getAttribute('data-being');
         if (being) {
             winProgress[being] = (winProgress[being] || 0) + 1;
             score += 10;
         }
-        cell.innerHTML = '';
-        cell.removeAttribute('data-being');
+
+        const img = cell.querySelector('img');
+        if (!img) return;
+
+        let frame = 0;
+        const frameCount = 7;
+        const frameDuration = 800 / frameCount;
+
+        const interval = setInterval(() => {
+            if (frame >= frameCount) {
+                clearInterval(interval);
+                cell.innerHTML = '';
+                cell.removeAttribute('data-being');
+                return;
+            }
+
+            img.src = `Animation Frames/frame_${frame}_delay-0.07s.png`;
+            frame++;
+        }, frameDuration);
     });
 
     updateStatus();
 
     setTimeout(() => {
-        refillMap();
-        const newMatches = findMatches();
-        if (newMatches.length > 0) {
-            clearMatches(newMatches);
-        } else {
-            checkGameOver();
-        }
-    }, 300);
+        refillMap(() => {
+            const newMatches = findMatches();
+            if (newMatches.length > 0) {
+                clearMatches(newMatches); // 👈 no need to pass a flag
+            } else {
+                isCascading = false;
+                hasPlayedMatchSoundThisCascade = false; // ✅ Reset again
+                isAnimating = false;
+                checkGameOver();
+            }
+        });
+    }, 820);
 }
 
-function refillMap() {
+function refillMap(callback) {
     const map = document.getElementById('map');
     const rows = map.rows;
     const rowCount = rows.length;
     const colCount = rows[0].cells.length;
 
-    for (let row = 0; row < rowCount; row++) {
+    for (let row = rowCount - 1; row >= 0; row--) {
         for (let col = 0; col < colCount; col++) {
             const cell = rows[row].cells[col];
             if (!cell.hasAttribute('data-being')) {
-                const creature = window.generateRandomBeingName();
-                cell.setAttribute('data-being', creature);
+                // Look above for a non-empty cell
+                let found = false;
+                for (let k = row - 1; k >= 0; k--) {
+                    const upperCell = rows[k].cells[col];
+                    if (upperCell.hasAttribute('data-being')) {
+                        const being = upperCell.getAttribute('data-being');
+                        const img = upperCell.querySelector('img');
 
-                const img = document.createElement('img');
-                img.src = `Images/${creature}.png`;
-                img.setAttribute('data-coords', `x${col}_y${row}`);
-                cell.appendChild(img);
+                        cell.setAttribute('data-being', being);
+                        cell.innerHTML = '';
+                        if (img) {
+                            const clone = img.cloneNode();
+                            clone.classList.add('falling');
+                            cell.appendChild(clone);
+                        }
 
-                // Rebind click handler
-                cell.addEventListener('click', () => onCellClick(cell, row, col));
+                        upperCell.removeAttribute('data-being');
+                        upperCell.innerHTML = '';
+                        found = true;
+                        break;
+                    }
+                }
+
+                // If no upper cells, spawn new
+                if (!found) {
+                    const creature = window.generateRandomBeingName();
+                    cell.setAttribute('data-being', creature);
+                    cell.innerHTML = '';
+
+                    const img = document.createElement('img');
+                    img.src = `Images/${creature}.png`;
+                    img.setAttribute('data-coords', `x${col}_y${row}`);
+                    img.classList.add('falling');
+                    cell.appendChild(img);
+                }
             }
         }
     }
+
+    // Let DOM update visually
+    setTimeout(() => {
+        if (typeof callback === 'function') callback();
+    }, 100);
 }
 
 let movesLeft = 15;
