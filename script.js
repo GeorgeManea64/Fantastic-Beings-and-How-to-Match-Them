@@ -255,32 +255,34 @@ function clearMatches(matchedCells) {
         hasPlayedMatchSoundThisCascade = false; // Start of new cascade
     }
 
-    matchedCells.forEach(cell => {
-        const being = cell.getAttribute('data-being');
-        if (being) {
-            winProgress[being] = (winProgress[being] || 0) + 1;
-            score += 10;
-        }
-
-        const img = cell.querySelector('img');
-        if (!img) return;
-
-        let frame = 0;
-        const frameCount = 7;
-        const frameDuration = 800 / frameCount;
-
-        const interval = setInterval(() => {
-            if (frame >= frameCount) {
-                clearInterval(interval);
-                cell.innerHTML = '';
-                cell.removeAttribute('data-being');
-                return;
+            matchedCells.forEach(cell => {
+            const being = cell.getAttribute('data-being');
+            if (being) {
+                winProgress[being] = (winProgress[being] || 0) + 1;
+                score += 10;
             }
 
-            img.src = `Animation Frames/frame_${frame}_delay-0.07s.png`;
-            frame++;
-        }, frameDuration);
-    });
+            const img = cell.querySelector('img');
+            if (!img) return;
+
+            let frame = 0;
+            const frameCount = 7;
+            const frameDuration = 800 / frameCount;
+
+            const animation = () => {
+                if (frame >= frameCount) {
+                    cell.innerHTML = '';
+                    cell.removeAttribute('data-being');
+                    return;
+                }
+
+                img.src = `Animation Frames/frame_${frame}_delay-0.07s.png`;
+                frame++;
+                setTimeout(animation, frameDuration);
+            };
+
+            animation(); // start animation
+        });
 
     updateStatus();
 
