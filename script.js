@@ -3,7 +3,6 @@ const matchSound = new Audio('SFX/match.wav');
 
 let firstSelectedCell = null;
 let isSwapping = false;
-
 let isCascading = false;
 let isAnimating = false;
 let hasPlayedMatchSound = false;
@@ -11,19 +10,24 @@ let hasPlayedMatchSoundThisCascade = false;
 
 const creatureTypes = ['zouwu', 'swooping', 'salamander', 'puffskein', 'kelpie'];
 
+let movesLeft = 15;
+let score = 0;
+let gameActive = true;
+
+const winTarget = {};
+const winProgress = {};
+
 window.generateRandomBeingName = function () {
     const index = Math.floor(Math.random() * creatureTypes.length);
     return creatureTypes[index];
 };
 
-// Clears the table
-window.clearMap = function() {
+window.clearMap = function () {
     const map = document.getElementById('map');
     map.innerHTML = '';
 };
 
-// Creates an empty map grid (with classed cells)
-window.renderMap = function(rowsCount, colsCount) {
+window.renderMap = function (rowsCount, colsCount) {
     const map = document.getElementById('map');
     window.clearMap();
 
@@ -37,7 +41,6 @@ window.renderMap = function(rowsCount, colsCount) {
         map.appendChild(tr);
     }
 
-    // Generate random creature grid and populate the map
     const creatureArray = Array.from({ length: rowsCount }, () =>
         Array.from({ length: colsCount }, () => generateRandomBeingName())
     );
@@ -45,8 +48,7 @@ window.renderMap = function(rowsCount, colsCount) {
     window.redrawMap(creatureArray);
 };
 
-// Draws creatures onto the map
-window.redrawMap = function(creatureArray) {
+window.redrawMap = function (creatureArray) {
     if (!Array.isArray(creatureArray) || creatureArray.length < 3 || !Array.isArray(creatureArray[0])) {
         return false;
     }
@@ -67,7 +69,6 @@ window.redrawMap = function(creatureArray) {
                 return false;
             }
 
-            // Clear the cell first
             cell.innerHTML = '';
             cell.setAttribute('data-being', creature);
 
@@ -75,6 +76,9 @@ window.redrawMap = function(creatureArray) {
             img.src = `Images/${creature}.png`;
             img.alt = creature;
             img.setAttribute('data-coords', `x${col}_y${row}`);
+            img.onerror = () => {
+                img.src = 'Images/fallback.png';
+            };
 
             cell.appendChild(img);
         }
@@ -83,20 +87,20 @@ window.redrawMap = function(creatureArray) {
     return true;
 };
 
-// On DOM load, initialize the map
 window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('map').addEventListener('click', (e) => {
-    const cell = e.target.closest('td.cell');
-    if (!cell || !cell.parentElement || !cell.parentElement.parentElement) return;
+        const cell = e.target.closest('td.cell');
+        if (!cell || !cell.parentElement || !cell.parentElement.parentElement) return;
 
-    const row = cell.parentElement.rowIndex;
-    const col = cell.cellIndex;
+        const row = cell.parentElement.rowIndex;
+        const col = cell.cellIndex;
 
-    onCellClick(cell, row, col);
+        onCellClick(cell, row, col);
+    });
 });
-});
+
 function onCellClick(cell, row, col) {
-    if (!gameActive || isSwapping || isAnimating) return; // <-- updated
+    if (!gameActive || isSwapping || isAnimating) return;
 
     if (!firstSelectedCell) {
         firstSelectedCell = { cell, row, col };
@@ -125,7 +129,8 @@ function onCellClick(cell, row, col) {
     }
 
     isSwapping = true;
-    isAnimating = true; // <-- prevent clicks
+    isAnimating = true;
+
     swapCells(firstCell, cell);
 
     firstCell.classList.remove('selected');
@@ -137,36 +142,45 @@ function swapCells(cellA, cellB) {
 
     const beingA = cellA.getAttribute('data-being');
     const beingB = cellB.getAttribute('data-being');
+
     const imgA = cellA.querySelector('img');
     const imgB = cellB.querySelector('img');
 
-    // Determine direction
     const dx = cellB.cellIndex - cellA.cellIndex;
     const dy = cellB.parentElement.rowIndex - cellA.parentElement.rowIndex;
-
     const offsetX = dx * cellA.offsetWidth;
     const offsetY = dy * cellA.offsetHeight;
 
-    // Apply transform to animate
+    // Animate the images
     imgA.style.transition = 'transform 0.3s ease';
     imgB.style.transition = 'transform 0.3s ease';
     imgA.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
     imgB.style.transform = `translate(${-offsetX}px, ${-offsetY}px)`;
 
-    setTimeout(() => {
-        // Reset transform styles
-        imgA.style.transition = '';
-        imgB.style.transition = '';
-        imgA.style.transform = '';
-        imgB.style.transform = '';
+    isSwapping = true;
+    isAnimating = true;
 
-        // Swap images and data
+    setTimeout(() => {
+        // 1. Swap data-being
         cellA.setAttribute('data-being', beingB);
         cellB.setAttribute('data-being', beingA);
-        cellA.innerHTML = '';
-        cellB.innerHTML = '';
-        if (imgB) cellA.appendChild(imgB);
-        if (imgA) cellB.appendChild(imgA);
+
+        // 2. Re-query images after DOM update
+        const updatedImgA = cellA.querySelector('img');
+        const updatedImgB = cellB.querySelector('img');
+
+        if (updatedImgA) updatedImgA.src = `Images/${beingB}.png`;
+        if (updatedImgB) updatedImgB.src = `Images/${beingA}.png`;
+
+        // Reset styles
+        if (updatedImgA) {
+            updatedImgA.style.transition = '';
+            updatedImgA.style.transform = '';
+        }
+        if (updatedImgB) {
+            updatedImgB.style.transition = '';
+            updatedImgB.style.transform = '';
+        }
 
         const matched = findMatches();
 
@@ -179,27 +193,49 @@ function swapCells(cellA, cellB) {
             isCascading = true;
             movesLeft--;
             document.getElementById('moves-value').textContent = movesLeft;
-            clearMatches(matched);
+
+            setTimeout(() => clearMatches(matched), 50);
         } else {
+            // Revert swap
             setTimeout(() => {
-                // Revert if no match
                 cellA.setAttribute('data-being', beingA);
                 cellB.setAttribute('data-being', beingB);
-                cellA.innerHTML = '';
-                cellB.innerHTML = '';
-                if (imgA) cellA.appendChild(imgA);
-                if (imgB) cellB.appendChild(imgB);
-                isSwapping = false;
-                isAnimating = false;
-            }, 300);
-            return;
-        }
 
-        setTimeout(() => {
-            isSwapping = false;
-        }, 1000);
+                const revertImgA = cellA.querySelector('img');
+                const revertImgB = cellB.querySelector('img');
+
+                if (revertImgA) {
+                    revertImgA.src = `Creatures/${beingA}.png`;
+                    revertImgA.style.transition = 'transform 0.3s ease';
+                    revertImgA.style.transform = 'translate(0px, 0px)';
+                }
+
+                if (revertImgB) {
+                    revertImgB.src = `Creatures/${beingB}.png`;
+                    revertImgB.style.transition = 'transform 0.3s ease';
+                    revertImgB.style.transform = 'translate(0px, 0px)';
+                }
+
+                setTimeout(() => {
+                    if (revertImgA) {
+                        revertImgA.style.transition = '';
+                        revertImgA.style.transform = '';
+                    }
+                    if (revertImgB) {
+                        revertImgB.style.transition = '';
+                        revertImgB.style.transform = '';
+                    }
+
+                    isSwapping = false;
+                    isAnimating = false;
+                    movesLeft--;
+                    document.getElementById('moves-value').textContent = movesLeft;
+                }, 300);
+            }, 50);
+        }
     }, 300);
 }
+
 
 function findMatches() {
     const map = document.getElementById('map');
@@ -208,7 +244,6 @@ function findMatches() {
     const rowCount = rows.length;
     const colCount = rows[0].cells.length;
 
-    // Check horizontal
     for (let row = 0; row < rowCount; row++) {
         let match = [rows[row].cells[0]];
         for (let col = 1; col < colCount; col++) {
@@ -224,7 +259,6 @@ function findMatches() {
         if (match.length >= 3) matched.push(...match);
     }
 
-    // Check vertical
     for (let col = 0; col < colCount; col++) {
         let match = [rows[0].cells[col]];
         for (let row = 1; row < rowCount; row++) {
@@ -240,65 +274,84 @@ function findMatches() {
         if (match.length >= 3) matched.push(...match);
     }
 
+    matched.forEach(cell => {
+        cell.setAttribute('data-matched', 'true');
+    });
+
     return [...new Set(matched)];
+}
+
+function playMatchSound() {
+    if (!matchSound.paused && !matchSound.ended) return; // already playing
+
+    matchSound.currentTime = 0;
+    matchSound.play().catch(e => console.warn('Match sound failed to play:', e));
 }
 
 function clearMatches(matchedCells) {
     if (matchedCells.length === 0) {
         isCascading = false;
-        hasPlayedMatchSoundThisCascade = false; // Reset for next cascade
+        hasPlayedMatchSoundThisCascade = false;
+        isAnimating = false;
         return;
+    }
+
+    // Play once per match/cascade level
+    if (!hasPlayedMatchSoundThisCascade) {
+        playMatchSound();
+        hasPlayedMatchSoundThisCascade = true;
     }
 
     if (!isCascading) {
         isCascading = true;
-        hasPlayedMatchSoundThisCascade = false; // Start of new cascade
     }
 
-            matchedCells.forEach(cell => {
-            const being = cell.getAttribute('data-being');
-            if (being) {
-                winProgress[being] = (winProgress[being] || 0) + 1;
-                score += 10;
+    matchedCells.forEach(cell => {
+        const img = cell.querySelector('img');
+        if (!img || !cell.hasAttribute('data-being')) return;
+
+        const being = cell.getAttribute('data-being');
+        winProgress[being] = (winProgress[being] || 0) + 1;
+        score += 10;
+
+        let frame = 0;
+        const frameCount = 7;
+        const frameDuration = 800 / frameCount;
+
+        const animateFrame = () => {
+            if (!document.body.contains(img)) return;
+            if (frame >= frameCount) {
+                cell.innerHTML = '';
+                cell.removeAttribute('data-being');
+                return;
             }
+            img.src = `Animation Frames/frame_${frame}_delay-0.07s.png`;
+            frame++;
+            setTimeout(animateFrame, frameDuration);
+        };
 
-            const img = cell.querySelector('img');
-            if (!img) return;
-
-            let frame = 0;
-            const frameCount = 7;
-            const frameDuration = 800 / frameCount;
-
-            const animation = () => {
-                if (frame >= frameCount) {
-                    cell.innerHTML = '';
-                    cell.removeAttribute('data-being');
-                    return;
-                }
-
-                img.src = `Animation Frames/frame_${frame}_delay-0.07s.png`;
-                frame++;
-                setTimeout(animation, frameDuration);
-            };
-
-            animation(); // start animation
-        });
+        animateFrame();
+    });
 
     updateStatus();
 
     setTimeout(() => {
         refillMap(() => {
-            const newMatches = findMatches();
-            if (newMatches.length > 0) {
-                clearMatches(newMatches); // 👈 no need to pass a flag
-            } else {
-                isCascading = false;
-                hasPlayedMatchSoundThisCascade = false; // ✅ Reset again
-                isAnimating = false;
-                checkGameOver();
-            }
+            setTimeout(() => {
+                const newMatches = findMatches();
+                if (newMatches.length > 0) {
+                    hasPlayedMatchSoundThisCascade = false; // allow sound next match in cascade
+                    clearMatches(newMatches);
+                } else {
+                    isCascading = false;
+                    hasPlayedMatchSoundThisCascade = false;
+                    isAnimating = false;
+                    isSwapping = false;
+                    checkGameOver();
+                }
+            }, 150);
         });
-    }, 820);
+    }, 800);
 }
 
 function refillMap(callback) {
@@ -311,7 +364,6 @@ function refillMap(callback) {
         for (let col = 0; col < colCount; col++) {
             const cell = rows[row].cells[col];
             if (!cell.hasAttribute('data-being')) {
-                // Look above for a non-empty cell
                 let found = false;
                 for (let k = row - 1; k >= 0; k--) {
                     const upperCell = rows[k].cells[col];
@@ -334,7 +386,6 @@ function refillMap(callback) {
                     }
                 }
 
-                // If no upper cells, spawn new
                 if (!found) {
                     const creature = window.generateRandomBeingName();
                     cell.setAttribute('data-being', creature);
@@ -344,24 +395,20 @@ function refillMap(callback) {
                     img.src = `Images/${creature}.png`;
                     img.setAttribute('data-coords', `x${col}_y${row}`);
                     img.classList.add('falling');
+                    img.onerror = () => {
+                        img.src = 'Images/fallback.png';
+                    };
+
                     cell.appendChild(img);
                 }
             }
         }
     }
 
-    // Let DOM update visually
     setTimeout(() => {
         if (typeof callback === 'function') callback();
     }, 100);
 }
-
-let movesLeft = 15;
-let score = 0;
-let gameActive = true;
-
-const winTarget = {};
-const winProgress = {};
 
 function updateStatus() {
     document.getElementById('score-value').textContent = score;
@@ -391,7 +438,7 @@ function checkGameOver() {
 }
 
 function generateWinConditions() {
-    const targetCount = Math.floor(Math.random() * 3) + 1; // 1 to 3 creatures
+    const targetCount = Math.floor(Math.random() * 2) + 1;
     const selected = [];
 
     while (selected.length < targetCount) {
@@ -402,7 +449,7 @@ function generateWinConditions() {
     }
 
     selected.forEach(creature => {
-        const count = Math.floor(Math.random() * 6) + 5; // Between 5 and 10
+        const count = Math.floor(Math.random() * 6) + 5;
         winTarget[creature] = count;
         winProgress[creature] = 0;
     });
