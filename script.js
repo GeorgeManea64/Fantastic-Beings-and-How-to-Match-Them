@@ -185,15 +185,10 @@ function swapCells(cellA, cellB) {
         const matched = findMatches();
 
         if (matched.length > 0) {
-            matchSound.pause();
-            matchSound.currentTime = 0;
-            matchSound.play().catch(e => console.warn('Match sound failed to play:', e));
-            hasPlayedMatchSoundThisCascade = true;
-
             isCascading = true;
             movesLeft--;
             document.getElementById('moves-value').textContent = movesLeft;
-
+        
             setTimeout(() => clearMatches(matched), 50);
         } else {
             // Revert swap
@@ -205,13 +200,13 @@ function swapCells(cellA, cellB) {
                 const revertImgB = cellB.querySelector('img');
 
                 if (revertImgA) {
-                    revertImgA.src = `Creatures/${beingA}.png`;
+                    revertImgA.src = `Images/${beingA}.png`;  // ✅ FIXED PATH
                     revertImgA.style.transition = 'transform 0.3s ease';
                     revertImgA.style.transform = 'translate(0px, 0px)';
                 }
 
                 if (revertImgB) {
-                    revertImgB.src = `Creatures/${beingB}.png`;
+                    revertImgB.src = `Images/${beingB}.png`;  // ✅ FIXED PATH
                     revertImgB.style.transition = 'transform 0.3s ease';
                     revertImgB.style.transform = 'translate(0px, 0px)';
                 }
@@ -235,7 +230,6 @@ function swapCells(cellA, cellB) {
         }
     }, 300);
 }
-
 
 function findMatches() {
     const map = document.getElementById('map');
@@ -282,22 +276,28 @@ function findMatches() {
 }
 
 function playMatchSound() {
-    if (!matchSound.paused && !matchSound.ended) return; // already playing
-
-    matchSound.currentTime = 0;
-    matchSound.play().catch(e => console.warn('Match sound failed to play:', e));
+    if (!matchSound) return;
+    try {
+        matchSound.pause();
+        matchSound.currentTime = 0;
+        matchSound.play().catch(e => console.warn('Sound playback failed:', e));
+    } catch (e) {
+        console.warn('Sound playback error:', e);
+    }
 }
 
-function clearMatches(matchedCells) {
+function clearMatches(matchedCells, playSoundThisClear = true) {
     if (matchedCells.length === 0) {
         isCascading = false;
-        hasPlayedMatchSoundThisCascade = false;
         isAnimating = false;
+        isSwapping = false;
+        hasPlayedMatchSoundThisCascade = false;
+        checkGameOver();
         return;
     }
 
-    // Play once per match/cascade level
-    if (!hasPlayedMatchSoundThisCascade) {
+    // ✅ Play sound ONLY if allowed in this call
+    if (playSoundThisClear && !hasPlayedMatchSoundThisCascade) {
         playMatchSound();
         hasPlayedMatchSoundThisCascade = true;
     }
@@ -312,7 +312,7 @@ function clearMatches(matchedCells) {
 
         const being = cell.getAttribute('data-being');
         winProgress[being] = (winProgress[being] || 0) + 1;
-        score += 10;
+        score += 15;
 
         let frame = 0;
         const frameCount = 7;
@@ -340,8 +340,7 @@ function clearMatches(matchedCells) {
             setTimeout(() => {
                 const newMatches = findMatches();
                 if (newMatches.length > 0) {
-                    hasPlayedMatchSoundThisCascade = false; // allow sound next match in cascade
-                    clearMatches(newMatches);
+                    clearMatches(newMatches, true); // ⬅️ Allow sound for each match in cascade
                 } else {
                     isCascading = false;
                     hasPlayedMatchSoundThisCascade = false;
@@ -353,6 +352,7 @@ function clearMatches(matchedCells) {
         });
     }, 800);
 }
+
 
 function refillMap(callback) {
     const map = document.getElementById('map');
